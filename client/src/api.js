@@ -45,6 +45,9 @@ export const api = {
   getEmployeeExpenses: (empId) => request(`/employees/${empId}/expenses`),
   addEmployeeExpense: (empId, data) => request(`/employees/${empId}/expenses`, { method: 'POST', body: JSON.stringify(data) }),
   toggleEmployee: (empId) => request(`/employees/${empId}/toggle`, { method: 'PATCH' }),
+  giveAdvance: (empId, data) => request(`/employees/${empId}/advance`, { method: 'POST', body: JSON.stringify(data) }),
+  getEmployeeAdvances: (empId) => request(`/employees/${empId}/advances`),
+  settleAdvance: (empId, advanceId) => request(`/employees/${empId}/advance/${advanceId}/settle`, { method: 'POST' }),
 
   // Analytics
   getAnalytics: (params) => request(`/analytics?${new URLSearchParams(params)}`),

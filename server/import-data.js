@@ -187,6 +187,29 @@ async function importData() {
     );
     count++;
 
+    // Sajid TPT expenses (11 entries, Rs 250,400)
+    const sajidTPT = [
+      { date: '2026-03-02', desc: 'Adv Junaid milk bill', amount: 16000, cat: 'Supplies' },
+      { date: '2026-03-02', desc: 'Rana nadeem salary', amount: 31000, cat: 'Salary' },
+      { date: '2026-03-02', desc: 'Raffique salary', amount: 43000, cat: 'Salary' },
+      { date: '2026-03-02', desc: 'Gull sher salary', amount: 30000, cat: 'Salary' },
+      { date: '2026-03-02', desc: 'Tahir salary', amount: 30000, cat: 'Salary' },
+      { date: '2026-03-02', desc: 'Ofc milk bill 3kg', amount: 14000, cat: 'Supplies' },
+      { date: '2026-03-02', desc: 'Irfan salary', amount: 45000, cat: 'Salary' },
+      { date: '2026-03-02', desc: 'Gl', amount: 600, cat: 'Miscellaneous' },
+      { date: '2026-03-03', desc: 'Junaid salary', amount: 30000, cat: 'Salary' },
+      { date: '2026-03-04', desc: 'Ofc net', amount: 9300, cat: 'Utilities' },
+      { date: '2026-03-04', desc: 'Ofc kharcha', amount: 1500, cat: 'Miscellaneous' },
+    ];
+    console.log('\nInserting 11 Sajid TPT expense entries...');
+    for (const e of sajidTPT) {
+      await client.query(
+        'INSERT INTO transactions (business_id, user_id, type, source, currency, amount, description, category, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+        [tpt.id, sajid.id, 'expense', 'personal', 'PKR', e.amount, e.desc, e.cat, e.date]
+      );
+      count++;
+    }
+
     // Junaid entries go to TPT
     await client.query(
       'INSERT INTO transactions (business_id, user_id, type, source, amount, description, category, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',

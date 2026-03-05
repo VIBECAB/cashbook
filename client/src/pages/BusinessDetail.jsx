@@ -7,7 +7,7 @@ function fmt(n) {
   return new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 }
 
-const CATEGORIES = ['', 'Rent', 'Utilities', 'Supplies', 'Salary', 'Transport', 'Food', 'Marketing', 'Employee Budget', 'Miscellaneous'];
+const CATEGORIES = ['', 'Rent', 'Utilities', 'Supplies', 'Salary', 'Transport', 'Food', 'Marketing', 'Employee Budget', 'Employee Advance', 'Miscellaneous'];
 const CUR_SYMBOL = { PKR: 'Rs', GBP: '\u00a3' };
 
 export default function BusinessDetail() {
@@ -56,7 +56,7 @@ export default function BusinessDetail() {
   }, [id, month, currency]);
 
   useEffect(() => {
-    if (showForm && form.category === 'Employee Budget') {
+    if (showForm && (form.category === 'Employee Budget' || form.category === 'Employee Advance')) {
       api.getEmployees(id).then(emps => setEmployees(emps.filter(e => e.active))).catch(console.error);
     }
   }, [showForm, form.category, id]);
@@ -71,6 +71,9 @@ export default function BusinessDetail() {
         setEditingTx(null);
       } else if (form.category === 'Employee Budget' && selectedEmployee && form.type === 'expense') {
         await api.giveBudget(selectedEmployee, { amount: parseFloat(form.amount), description: form.description, date: form.date, business_id: id });
+        setSelectedEmployee('');
+      } else if (form.category === 'Employee Advance' && selectedEmployee && form.type === 'expense') {
+        await api.giveAdvance(selectedEmployee, { amount: parseFloat(form.amount), description: form.description, date: form.date, business_id: id });
         setSelectedEmployee('');
       } else {
         await api.addTransaction({ ...form, business_id: id, amount: parseFloat(form.amount), currency });
@@ -112,10 +115,10 @@ export default function BusinessDetail() {
 
   const cs = CUR_SYMBOL[currency];
   const filtered = filter === 'all' ? transactions : transactions.filter(t => t.type === filter);
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const totalWithdrawals = transactions.filter(t => t.type === 'withdrawal').reduce((s, t) => s + t.amount, 0);
-  const combinedIncome = transactions.filter(t => t.type === 'income' && t.source === 'combined').reduce((s, t) => s + t.amount, 0);
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
+  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
+  const totalWithdrawals = transactions.filter(t => t.type === 'withdrawal').reduce((s, t) => s + parseFloat(t.amount), 0);
+  const combinedIncome = transactions.filter(t => t.type === 'income' && t.source === 'combined').reduce((s, t) => s + parseFloat(t.amount), 0);
   const combinedBalance = combinedIncome - totalWithdrawals;
 
   return (
@@ -215,7 +218,7 @@ export default function BusinessDetail() {
             </div>
           )}
 
-          {form.category === 'Employee Budget' && form.type === 'expense' && !editingTx && (
+          {(form.category === 'Employee Budget' || form.category === 'Employee Advance') && form.type === 'expense' && !editingTx && (
             <div className="mb-3">
               <label className="label">Employee</label>
               <select className="input" value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} required>

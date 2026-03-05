@@ -23,7 +23,8 @@ router.get('/', async (req, res) => {
       SELECT e.id, e.name, e.username, e.business_id, e.active, e.created_at,
         u.name as created_by_name,
         COALESCE((SELECT SUM(amount) FROM employee_budgets WHERE employee_id = e.id), 0) as total_budget,
-        COALESCE((SELECT SUM(amount) FROM employee_expenses WHERE employee_id = e.id), 0) as total_spent
+        COALESCE((SELECT SUM(amount) FROM employee_expenses WHERE employee_id = e.id), 0) as total_spent,
+        COALESCE((SELECT SUM(amount) FROM employee_advances WHERE employee_id = e.id AND settled = 0), 0) as unsettled_advances
       FROM employees e
       JOIN users u ON e.created_by = u.id
       WHERE e.business_id = $1
@@ -190,6 +191,83 @@ router.post('/:id/expenses', async (req, res) => {
     `, [employee.id, employee.business_id, amount, description || '', date]);
 
     res.status(201).json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Give advance to employee
+router.post('/:id/advance', partnerOnly, async (req, res) => {
+  try {
+    const { amount, description, date, business_id } = req.body;
+    if (!amount || !date || !business_id) {
+      return res.status(400).json({ error: 'amount, date, business_id required' });
+    }
+
+    const employee = await db.get('SELECT * FROM employees WHERE id = $1 AND active = 1', [req.params.id]);
+    if (!employee) return res.status(404).json({ error: 'Employee not found' });
+
+    const access = await db.get('SELECT 1 FROM business_partners WHERE business_id = $1 AND user_id = $2',
+      [business_id, req.user.id]);
+    if (!access) return res.status(403).json({ error: 'No access' });
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Log expense for the partner
+      const txResult = await client.query(`
+        INSERT INTO transactions (business_id, user_id, type, source, amount, description, category, date)
+        VALUES ($1, $2, 'expense', 'personal', $3, $4, 'Employee Advance', $5)
+        RETURNING id
+      `, [business_id, req.user.id, amount, `Advance to ${employee.name}: ${description || ''}`, date]);
+
+      // 2. Log advance for the employee
+      await client.query(`
+        INSERT INTO employee_advances (employee_id, partner_id, business_id, amount, description, date)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [employee.id, req.user.id, business_id, amount, description || '', date]);
+
+      await client.query('COMMIT');
+      client.release();
+
+      res.status(201).json({ success: true, transaction_id: txResult.rows[0].id });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      client.release();
+      throw e;
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get employee advances
+router.get('/:id/advances', async (req, res) => {
+  try {
+    const advances = await db.all(`
+      SELECT ea.*, u.name as partner_name
+      FROM employee_advances ea
+      JOIN users u ON ea.partner_id = u.id
+      WHERE ea.employee_id = $1
+      ORDER BY ea.date DESC
+    `, [req.params.id]);
+
+    res.json(advances);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Settle advance (deduct from next budget)
+router.post('/:id/advance/:advanceId/settle', partnerOnly, async (req, res) => {
+  try {
+    const advance = await db.get('SELECT * FROM employee_advances WHERE id = $1 AND employee_id = $2 AND settled = 0',
+      [req.params.advanceId, req.params.id]);
+    if (!advance) return res.status(404).json({ error: 'Advance not found or already settled' });
+
+    await db.query('UPDATE employee_advances SET settled = 1 WHERE id = $1', [advance.id]);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
