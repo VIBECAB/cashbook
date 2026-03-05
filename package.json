@@ -7,15 +7,16 @@
     "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "build": "cd client && npm run build",
-    "start": "node server/auto-setup.js && NODE_ENV=production node server/index.js",
+    "start": "NODE_ENV=production node server/index.js",
     "seed": "node server/seed.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.7.0",
     "concurrently": "^9.1.2",
     "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
     "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.20.0"
   }
 }

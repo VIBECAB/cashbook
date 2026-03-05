@@ -7,10 +7,9 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Given partner settlements, calculate who should pay whom
-// Partners with negative settlement owe money, positive ones should receive
 function calculateTransfers(partners) {
-  const debtors = []; // owe money (settlement < 0)
-  const creditors = []; // should receive (settlement > 0)
+  const debtors = [];
+  const creditors = [];
 
   for (const p of partners) {
     if (p.settlement < -0.5) {
@@ -20,7 +19,6 @@ function calculateTransfers(partners) {
     }
   }
 
-  // Sort: largest debts first, largest credits first
   debtors.sort((a, b) => b.amount - a.amount);
   creditors.sort((a, b) => b.amount - a.amount);
 
@@ -48,341 +46,351 @@ function calculateTransfers(partners) {
 }
 
 // Get monthly analytics for a business
-router.get('/', (req, res) => {
-  const { business_id, month, year, currency } = req.query;
-  if (!business_id || !month || !year) {
-    return res.status(400).json({ error: 'business_id, month, year required' });
-  }
+router.get('/', async (req, res) => {
+  try {
+    const { business_id, month, year, currency } = req.query;
+    if (!business_id || !month || !year) {
+      return res.status(400).json({ error: 'business_id, month, year required' });
+    }
 
-  // Verify access
-  if (req.user.role === 'partner') {
-    const access = db.prepare('SELECT 1 FROM business_partners WHERE business_id = ? AND user_id = ?')
-      .get(business_id, req.user.id);
-    if (!access) return res.status(403).json({ error: 'No access' });
-  }
+    // Verify access
+    if (req.user.role === 'partner') {
+      const access = await db.get('SELECT 1 FROM business_partners WHERE business_id = $1 AND user_id = $2',
+        [business_id, req.user.id]);
+      if (!access) return res.status(403).json({ error: 'No access' });
+    }
 
-  const monthStr = month.toString().padStart(2, '0');
-  const cur = currency || 'PKR';
-  const curFilter = ` AND currency = '${cur === 'GBP' ? 'GBP' : 'PKR'}'`;
+    const monthStr = month.toString().padStart(2, '0');
+    const cur = currency || 'PKR';
+    const safeCur = cur === 'GBP' ? 'GBP' : 'PKR';
 
-  // Get partners and shares
-  const partners = db.prepare(`
-    SELECT u.id, u.name, bp.share_percentage
-    FROM business_partners bp
-    JOIN users u ON bp.user_id = u.id
-    WHERE bp.business_id = ?
-  `).all(business_id);
-
-  // Get total income
-  const totalIncome = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total
-    FROM transactions
-    WHERE business_id = ? AND type = 'income'
-    AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-  `).get(business_id, monthStr, year).total;
-
-  // Get combined income
-  const combinedIncome = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total
-    FROM transactions
-    WHERE business_id = ? AND type = 'income' AND source = 'combined'
-    AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-  `).get(business_id, monthStr, year).total;
-
-  // Get total expenses
-  const totalExpenses = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total
-    FROM transactions
-    WHERE business_id = ? AND type = 'expense'
-    AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-  `).get(business_id, monthStr, year).total;
-
-  // Get total withdrawals from combined account
-  const totalWithdrawals = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total
-    FROM transactions
-    WHERE business_id = ? AND type = 'withdrawal'
-    AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-  `).get(business_id, monthStr, year).total;
-
-  const profit = totalIncome - totalExpenses;
-  const combinedBalance = combinedIncome - totalWithdrawals;
-
-  // Per-partner breakdown
-  const partnerBreakdown = partners.map(p => {
-    const personalIncome = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM transactions
-      WHERE business_id = ? AND user_id = ? AND type = 'income' AND source = 'personal'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(business_id, p.id, monthStr, year).total;
-
-    const personalExpenses = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM transactions
-      WHERE business_id = ? AND user_id = ? AND type = 'expense'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(business_id, p.id, monthStr, year).total;
-
-    // Withdrawals from combined account by this partner
-    const withdrawals = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM transactions
-      WHERE business_id = ? AND user_id = ? AND type = 'withdrawal'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(business_id, p.id, monthStr, year).total;
-
-    const profitShare = profit * (p.share_percentage / 100);
-
-    // Settlement calculation:
-    // Partner is holding: personalIncome + withdrawals (money they took from business)
-    // Partner spent for business: personalExpenses
-    // Net position = (personalIncome + withdrawals) - personalExpenses
-    // Settlement = profitShare - netPosition
-    const netPosition = (personalIncome + withdrawals) - personalExpenses;
-    const settlement = profitShare - netPosition;
-
-    return {
-      id: p.id,
-      name: p.name,
-      share_percentage: p.share_percentage,
-      personal_income: personalIncome,
-      personal_expenses: personalExpenses,
-      withdrawals,
-      profit_share: profitShare,
-      net_position: netPosition,
-      settlement
-    };
-  });
-
-  // Income by source
-  const incomeByPartner = db.prepare(`
-    SELECT u.name, COALESCE(SUM(t.amount), 0) as total
-    FROM transactions t
-    JOIN users u ON t.user_id = u.id
-    WHERE t.business_id = ? AND t.type = 'income' AND t.source = 'personal'
-    AND strftime('%m', t.date) = ? AND strftime('%Y', t.date) = ?${curFilter.replace(/currency/g, 't.currency')}
-    GROUP BY t.user_id
-  `).all(business_id, monthStr, year);
-
-  // Expenses by partner
-  const expensesByPartner = db.prepare(`
-    SELECT u.name, COALESCE(SUM(t.amount), 0) as total
-    FROM transactions t
-    JOIN users u ON t.user_id = u.id
-    WHERE t.business_id = ? AND t.type = 'expense'
-    AND strftime('%m', t.date) = ? AND strftime('%Y', t.date) = ?${curFilter.replace(/currency/g, 't.currency')}
-    GROUP BY t.user_id
-  `).all(business_id, monthStr, year);
-
-  // Expense categories
-  const expensesByCategory = db.prepare(`
-    SELECT CASE WHEN category = '' THEN 'Uncategorized' ELSE category END as category,
-           COALESCE(SUM(amount), 0) as total
-    FROM transactions
-    WHERE business_id = ? AND type = 'expense'
-    AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    GROUP BY category
-    ORDER BY total DESC
-  `).all(business_id, monthStr, year);
-
-  // Daily totals for chart
-  const dailyData = db.prepare(`
-    SELECT date,
-      SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
-      SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses
-    FROM transactions
-    WHERE business_id = ?
-    AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    GROUP BY date
-    ORDER BY date
-  `).all(business_id, monthStr, year);
-
-  // Calculate transfers: who should pay whom
-  const transfers = calculateTransfers(partnerBreakdown);
-
-  // Withdrawals by partner
-  const withdrawalsByPartner = db.prepare(`
-    SELECT u.name, COALESCE(SUM(t.amount), 0) as total
-    FROM transactions t
-    JOIN users u ON t.user_id = u.id
-    WHERE t.business_id = ? AND t.type = 'withdrawal'
-    AND strftime('%m', t.date) = ? AND strftime('%Y', t.date) = ?${curFilter.replace(/currency/g, 't.currency')}
-    GROUP BY t.user_id
-  `).all(business_id, monthStr, year);
-
-  res.json({
-    currency: cur,
-    total_income: totalIncome,
-    combined_income: combinedIncome,
-    total_expenses: totalExpenses,
-    total_withdrawals: totalWithdrawals,
-    combined_balance: combinedBalance,
-    profit,
-    partners: partnerBreakdown,
-    transfers,
-    income_by_partner: incomeByPartner,
-    expenses_by_partner: expensesByPartner,
-    expenses_by_category: expensesByCategory,
-    withdrawals_by_partner: withdrawalsByPartner,
-    daily_data: dailyData
-  });
-});
-
-// Dashboard summary - all businesses for a partner
-router.get('/dashboard', (req, res) => {
-  if (req.user.role !== 'partner') {
-    return res.status(403).json({ error: 'Partners only' });
-  }
-
-  const now = new Date();
-  const monthStr = (now.getMonth() + 1).toString().padStart(2, '0');
-  const yearStr = now.getFullYear().toString();
-
-  const businesses = db.prepare(`
-    SELECT b.*, bp.share_percentage
-    FROM businesses b
-    JOIN business_partners bp ON b.id = bp.business_id
-    WHERE bp.user_id = ?
-  `).all(req.user.id);
-
-  function getBusinessSummary(biz, cur) {
-    const curFilter = ` AND currency = '${cur}'`;
-
-    const totalIncome = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE business_id = ? AND type = 'income'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(biz.id, monthStr, yearStr).total;
-
-    const totalExpenses = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE business_id = ? AND type = 'expense'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(biz.id, monthStr, yearStr).total;
-
-    const myIncome = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE business_id = ? AND user_id = ? AND type = 'income' AND source = 'personal'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(biz.id, req.user.id, monthStr, yearStr).total;
-
-    const myExpenses = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE business_id = ? AND user_id = ? AND type = 'expense'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(biz.id, req.user.id, monthStr, yearStr).total;
-
-    const myWithdrawals = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE business_id = ? AND user_id = ? AND type = 'withdrawal'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(biz.id, req.user.id, monthStr, yearStr).total;
-
-    // Combined account balance (for PKR combined view)
-    const combinedIncome = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE business_id = ? AND type = 'income' AND source = 'combined'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(biz.id, monthStr, yearStr).total;
-
-    const totalWithdrawals = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-      WHERE business_id = ? AND type = 'withdrawal'
-      AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-    `).get(biz.id, monthStr, yearStr).total;
-
-    const profit = totalIncome - totalExpenses;
-    const myShare = profit * (biz.share_percentage / 100);
-
-    // Balance: for combined accounts it's combined income - withdrawals, otherwise income - expenses
-    const account_balance = biz.has_combined_account && cur === 'PKR'
-      ? combinedIncome - totalWithdrawals
-      : totalIncome - totalExpenses;
-
-    const allPartners = db.prepare(`
+    // Get partners and shares
+    const partners = await db.all(`
       SELECT u.id, u.name, bp.share_percentage
       FROM business_partners bp
       JOIN users u ON bp.user_id = u.id
-      WHERE bp.business_id = ?
-    `).all(biz.id);
+      WHERE bp.business_id = $1
+    `, [business_id]);
 
-    const partnerBreakdown = allPartners.map(p => {
-      const pIncome = db.prepare(`
+    // Get total income
+    const totalIncomeRow = await db.get(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+      WHERE business_id = $1 AND type = 'income'
+      AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+    `, [business_id, monthStr, year, safeCur]);
+    const totalIncome = parseFloat(totalIncomeRow.total);
+
+    // Get combined income
+    const combinedIncomeRow = await db.get(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+      WHERE business_id = $1 AND type = 'income' AND source = 'combined'
+      AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+    `, [business_id, monthStr, year, safeCur]);
+    const combinedIncome = parseFloat(combinedIncomeRow.total);
+
+    // Get total expenses
+    const totalExpensesRow = await db.get(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+      WHERE business_id = $1 AND type = 'expense'
+      AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+    `, [business_id, monthStr, year, safeCur]);
+    const totalExpenses = parseFloat(totalExpensesRow.total);
+
+    // Get total withdrawals
+    const totalWithdrawalsRow = await db.get(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+      WHERE business_id = $1 AND type = 'withdrawal'
+      AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+    `, [business_id, monthStr, year, safeCur]);
+    const totalWithdrawals = parseFloat(totalWithdrawalsRow.total);
+
+    const profit = totalIncome - totalExpenses;
+    const combinedBalance = combinedIncome - totalWithdrawals;
+
+    // Per-partner breakdown
+    const partnerBreakdown = [];
+    for (const p of partners) {
+      const piRow = await db.get(`
         SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-        WHERE business_id = ? AND user_id = ? AND type = 'income' AND source = 'personal'
-        AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-      `).get(biz.id, p.id, monthStr, yearStr).total;
+        WHERE business_id = $1 AND user_id = $2 AND type = 'income' AND source = 'personal'
+        AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+      `, [business_id, p.id, monthStr, year, safeCur]);
+      const personalIncome = parseFloat(piRow.total);
 
-      const pExpenses = db.prepare(`
+      const peRow = await db.get(`
         SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-        WHERE business_id = ? AND user_id = ? AND type = 'expense'
-        AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-      `).get(biz.id, p.id, monthStr, yearStr).total;
+        WHERE business_id = $1 AND user_id = $2 AND type = 'expense'
+        AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+      `, [business_id, p.id, monthStr, year, safeCur]);
+      const personalExpenses = parseFloat(peRow.total);
 
-      const pWithdrawals = db.prepare(`
+      const pwRow = await db.get(`
         SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-        WHERE business_id = ? AND user_id = ? AND type = 'withdrawal'
-        AND strftime('%m', date) = ? AND strftime('%Y', date) = ?${curFilter}
-      `).get(biz.id, p.id, monthStr, yearStr).total;
+        WHERE business_id = $1 AND user_id = $2 AND type = 'withdrawal'
+        AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+      `, [business_id, p.id, monthStr, year, safeCur]);
+      const withdrawals = parseFloat(pwRow.total);
 
-      const profitShare = profit * (p.share_percentage / 100);
-      const netPosition = (pIncome + pWithdrawals) - pExpenses;
+      const profitShare = profit * (parseFloat(p.share_percentage) / 100);
+      const netPosition = (personalIncome + withdrawals) - personalExpenses;
       const settlement = profitShare - netPosition;
 
-      return { id: p.id, name: p.name, share_percentage: p.share_percentage, settlement };
-    });
+      partnerBreakdown.push({
+        id: p.id,
+        name: p.name,
+        share_percentage: parseFloat(p.share_percentage),
+        personal_income: personalIncome,
+        personal_expenses: personalExpenses,
+        withdrawals,
+        profit_share: profitShare,
+        net_position: netPosition,
+        settlement
+      });
+    }
 
+    // Income by partner
+    const incomeByPartner = await db.all(`
+      SELECT u.name, COALESCE(SUM(t.amount), 0) as total
+      FROM transactions t
+      JOIN users u ON t.user_id = u.id
+      WHERE t.business_id = $1 AND t.type = 'income' AND t.source = 'personal'
+      AND TO_CHAR(t.date, 'MM') = $2 AND TO_CHAR(t.date, 'YYYY') = $3 AND t.currency = $4
+      GROUP BY t.user_id, u.name
+    `, [business_id, monthStr, year, safeCur]);
+
+    // Expenses by partner
+    const expensesByPartner = await db.all(`
+      SELECT u.name, COALESCE(SUM(t.amount), 0) as total
+      FROM transactions t
+      JOIN users u ON t.user_id = u.id
+      WHERE t.business_id = $1 AND t.type = 'expense'
+      AND TO_CHAR(t.date, 'MM') = $2 AND TO_CHAR(t.date, 'YYYY') = $3 AND t.currency = $4
+      GROUP BY t.user_id, u.name
+    `, [business_id, monthStr, year, safeCur]);
+
+    // Expense categories
+    const expensesByCategory = await db.all(`
+      SELECT CASE WHEN category = '' THEN 'Uncategorized' ELSE category END as category,
+             COALESCE(SUM(amount), 0) as total
+      FROM transactions
+      WHERE business_id = $1 AND type = 'expense'
+      AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+      GROUP BY category
+      ORDER BY total DESC
+    `, [business_id, monthStr, year, safeCur]);
+
+    // Daily totals for chart
+    const dailyData = await db.all(`
+      SELECT date,
+        SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
+        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses
+      FROM transactions
+      WHERE business_id = $1
+      AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+      GROUP BY date
+      ORDER BY date
+    `, [business_id, monthStr, year, safeCur]);
+
+    // Calculate transfers
     const transfers = calculateTransfers(partnerBreakdown);
 
-    return {
-      total_income: totalIncome,
-      total_expenses: totalExpenses,
-      profit,
-      my_income: myIncome,
-      my_expenses: myExpenses,
-      my_withdrawals: myWithdrawals,
-      my_share: myShare,
-      account_balance,
-      transfers
-    };
-  }
-
-  const summaries = businesses.map(biz => {
-    const defaultCur = biz.default_currency || 'PKR';
-    const main = getBusinessSummary(biz, defaultCur);
-
-    return {
-      id: biz.id,
-      name: biz.name,
-      has_combined_account: biz.has_combined_account,
-      share_percentage: biz.share_percentage,
-      default_currency: defaultCur,
-      ...main
-    };
-  });
-
-  // Recent transactions across all businesses
-  const businessIds = businesses.map(b => b.id);
-  let recentTransactions = [];
-  if (businessIds.length > 0) {
-    recentTransactions = db.prepare(`
-      SELECT t.*, u.name as user_name, b.name as business_name
+    // Withdrawals by partner
+    const withdrawalsByPartner = await db.all(`
+      SELECT u.name, COALESCE(SUM(t.amount), 0) as total
       FROM transactions t
-      LEFT JOIN users u ON t.user_id = u.id
-      JOIN businesses b ON t.business_id = b.id
-      WHERE t.business_id IN (${businessIds.map(() => '?').join(',')})
-      ORDER BY t.date DESC, t.created_at DESC
-      LIMIT 10
-    `).all(...businessIds);
-  }
+      JOIN users u ON t.user_id = u.id
+      WHERE t.business_id = $1 AND t.type = 'withdrawal'
+      AND TO_CHAR(t.date, 'MM') = $2 AND TO_CHAR(t.date, 'YYYY') = $3 AND t.currency = $4
+      GROUP BY t.user_id, u.name
+    `, [business_id, monthStr, year, safeCur]);
 
-  res.json({
-    month: monthStr,
-    year: yearStr,
-    businesses: summaries,
-    recent_transactions: recentTransactions
-  });
+    res.json({
+      currency: cur,
+      total_income: totalIncome,
+      combined_income: combinedIncome,
+      total_expenses: totalExpenses,
+      total_withdrawals: totalWithdrawals,
+      combined_balance: combinedBalance,
+      profit,
+      partners: partnerBreakdown,
+      transfers,
+      income_by_partner: incomeByPartner,
+      expenses_by_partner: expensesByPartner,
+      expenses_by_category: expensesByCategory,
+      withdrawals_by_partner: withdrawalsByPartner,
+      daily_data: dailyData
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Dashboard summary - all businesses for a partner
+router.get('/dashboard', async (req, res) => {
+  try {
+    if (req.user.role !== 'partner') {
+      return res.status(403).json({ error: 'Partners only' });
+    }
+
+    const now = new Date();
+    const monthStr = (now.getMonth() + 1).toString().padStart(2, '0');
+    const yearStr = now.getFullYear().toString();
+
+    const businesses = await db.all(`
+      SELECT b.*, bp.share_percentage
+      FROM businesses b
+      JOIN business_partners bp ON b.id = bp.business_id
+      WHERE bp.user_id = $1
+    `, [req.user.id]);
+
+    async function getBusinessSummary(biz, cur) {
+      const totalIncomeRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND type = 'income'
+        AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+      `, [biz.id, monthStr, yearStr, cur]);
+      const totalIncome = parseFloat(totalIncomeRow.total);
+
+      const totalExpensesRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND type = 'expense'
+        AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+      `, [biz.id, monthStr, yearStr, cur]);
+      const totalExpenses = parseFloat(totalExpensesRow.total);
+
+      const myIncomeRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND user_id = $2 AND type = 'income' AND source = 'personal'
+        AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+      `, [biz.id, req.user.id, monthStr, yearStr, cur]);
+      const myIncome = parseFloat(myIncomeRow.total);
+
+      const myExpensesRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND user_id = $2 AND type = 'expense'
+        AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+      `, [biz.id, req.user.id, monthStr, yearStr, cur]);
+      const myExpenses = parseFloat(myExpensesRow.total);
+
+      const myWithdrawalsRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND user_id = $2 AND type = 'withdrawal'
+        AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+      `, [biz.id, req.user.id, monthStr, yearStr, cur]);
+      const myWithdrawals = parseFloat(myWithdrawalsRow.total);
+
+      const combinedIncomeRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND type = 'income' AND source = 'combined'
+        AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+      `, [biz.id, monthStr, yearStr, cur]);
+      const combinedIncome = parseFloat(combinedIncomeRow.total);
+
+      const totalWithdrawalsRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND type = 'withdrawal'
+        AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+      `, [biz.id, monthStr, yearStr, cur]);
+      const totalWithdrawals = parseFloat(totalWithdrawalsRow.total);
+
+      const profit = totalIncome - totalExpenses;
+      const myShare = profit * (parseFloat(biz.share_percentage) / 100);
+
+      const account_balance = biz.has_combined_account && cur === 'PKR'
+        ? combinedIncome - totalWithdrawals
+        : totalIncome - totalExpenses;
+
+      const allPartners = await db.all(`
+        SELECT u.id, u.name, bp.share_percentage
+        FROM business_partners bp
+        JOIN users u ON bp.user_id = u.id
+        WHERE bp.business_id = $1
+      `, [biz.id]);
+
+      const partnerBreakdown = [];
+      for (const p of allPartners) {
+        const pIncomeRow = await db.get(`
+          SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+          WHERE business_id = $1 AND user_id = $2 AND type = 'income' AND source = 'personal'
+          AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+        `, [biz.id, p.id, monthStr, yearStr, cur]);
+
+        const pExpensesRow = await db.get(`
+          SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+          WHERE business_id = $1 AND user_id = $2 AND type = 'expense'
+          AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+        `, [biz.id, p.id, monthStr, yearStr, cur]);
+
+        const pWithdrawalsRow = await db.get(`
+          SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+          WHERE business_id = $1 AND user_id = $2 AND type = 'withdrawal'
+          AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+        `, [biz.id, p.id, monthStr, yearStr, cur]);
+
+        const pIncome = parseFloat(pIncomeRow.total);
+        const pExpenses = parseFloat(pExpensesRow.total);
+        const pWithdrawals = parseFloat(pWithdrawalsRow.total);
+        const profitShare = profit * (parseFloat(p.share_percentage) / 100);
+        const netPosition = (pIncome + pWithdrawals) - pExpenses;
+        const settlement = profitShare - netPosition;
+
+        partnerBreakdown.push({ id: p.id, name: p.name, share_percentage: parseFloat(p.share_percentage), settlement });
+      }
+
+      const transfers = calculateTransfers(partnerBreakdown);
+
+      return {
+        total_income: totalIncome,
+        total_expenses: totalExpenses,
+        profit,
+        my_income: myIncome,
+        my_expenses: myExpenses,
+        my_withdrawals: myWithdrawals,
+        my_share: myShare,
+        account_balance,
+        transfers
+      };
+    }
+
+    const summaries = [];
+    for (const biz of businesses) {
+      const defaultCur = biz.default_currency || 'PKR';
+      const main = await getBusinessSummary(biz, defaultCur);
+      summaries.push({
+        id: biz.id,
+        name: biz.name,
+        has_combined_account: biz.has_combined_account,
+        share_percentage: parseFloat(biz.share_percentage),
+        default_currency: defaultCur,
+        ...main
+      });
+    }
+
+    // Recent transactions across all businesses
+    const businessIds = businesses.map(b => b.id);
+    let recentTransactions = [];
+    if (businessIds.length > 0) {
+      const placeholders = businessIds.map((_, i) => `$${i + 1}`).join(',');
+      recentTransactions = await db.all(`
+        SELECT t.*, u.name as user_name, b.name as business_name
+        FROM transactions t
+        LEFT JOIN users u ON t.user_id = u.id
+        JOIN businesses b ON t.business_id = b.id
+        WHERE t.business_id IN (${placeholders})
+        ORDER BY t.date DESC, t.created_at DESC
+        LIMIT 10
+      `, businessIds);
+    }
+
+    res.json({
+      month: monthStr,
+      year: yearStr,
+      businesses: summaries,
+      recent_transactions: recentTransactions
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

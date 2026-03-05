@@ -1,6 +1,8 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const db = require('./db');
 
 const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
@@ -31,6 +33,12 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Initialize database then start server
+db.initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
 });

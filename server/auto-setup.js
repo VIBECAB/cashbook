@@ -1,22 +1,24 @@
-// Auto-setup: runs seed + migrations if database is empty
 const db = require('./db');
 
-const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+async function autoSetup() {
+  await db.initDb();
 
-if (userCount === 0) {
-  console.log('Empty database detected. Running seed...');
-  require('./seed');
+  const result = await db.get('SELECT COUNT(*) as count FROM users');
+  const userCount = parseInt(result.count);
 
-  console.log('Running import-data...');
-  require('./import-data');
+  if (userCount === 0) {
+    console.log('Empty database detected. Running seed...');
+    const seed = require('./seed');
+    await seed();
 
-  console.log('Running currency migration...');
-  require('./migrate-currency');
+    console.log('Running import-data...');
+    const importData = require('./import-data');
+    await importData();
 
-  console.log('Running GBP business migration...');
-  require('./migrate-gbp-business');
-
-  console.log('Auto-setup complete!');
-} else {
-  console.log('Database already has data, skipping auto-setup.');
+    console.log('Auto-setup complete!');
+  } else {
+    console.log('Database already has data, skipping auto-setup.');
+  }
 }
+
+autoSetup().catch(err => { console.error('Auto-setup failed:', err); process.exit(1); });
