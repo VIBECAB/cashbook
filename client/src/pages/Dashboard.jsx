@@ -1,0 +1,136 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
+
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function fmt(n) {
+  return new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+}
+
+export default function Dashboard() {
+  const { user } = useAuth();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getDashboard().then(setData).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="flex justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-slate-300 border-t-slate-800 rounded-full"></div></div>;
+
+  const now = new Date();
+  const monthName = MONTHS[now.getMonth()];
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold">Welcome, {user.name}</h1>
+        <p className="text-slate-500 text-sm">{monthName} {now.getFullYear()} Overview</p>
+      </div>
+
+      {/* Business Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 mb-8">
+        {data?.businesses?.map(biz => {
+          const cs = biz.default_currency === 'GBP' ? '\u00a3' : 'Rs';
+          const balanceLabel = biz.has_combined_account ? 'Kiddie Tube Balance' : biz.default_currency === 'GBP' ? 'GBP Balance' : 'Balance';
+          return (
+          <Link key={biz.id} to={`/business/${biz.id}`} className="card hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">{biz.name}</h2>
+              <span className="badge bg-slate-100 text-slate-600">Partner</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-slate-500">Total Income</p>
+                <p className="font-semibold text-emerald-600">{cs} {fmt(biz.total_income)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Total Expenses</p>
+                <p className="font-semibold text-red-600">{cs} {fmt(biz.total_expenses)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">{biz.profit >= 0 ? 'Profit' : 'Loss'}</p>
+                <p className={`font-semibold ${biz.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {cs} {fmt(Math.abs(biz.profit))}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Your Share</p>
+                <p className={`font-semibold ${biz.my_share >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {cs} {fmt(Math.abs(biz.my_share))}
+                </p>
+              </div>
+            </div>
+
+            {/* Account Balance */}
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-500">{balanceLabel}</span>
+              <span className={`font-bold text-sm ${(biz.account_balance || 0) >= 0 ? 'text-sky-600' : 'text-red-600'}`}>
+                {cs} {fmt(biz.account_balance || 0)}
+              </span>
+            </div>
+
+            {/* Charity */}
+            {biz.profit > 0 && (
+              <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
+                <span>Your Charity (10%): </span>
+                <span className="font-semibold text-purple-600">{cs} {fmt(Math.round(biz.my_share * 0.1))}</span>
+              </div>
+            )}
+
+            <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-3 text-xs text-slate-500">
+              <div>Your Income: <span className="font-medium text-slate-700">{cs} {fmt(biz.my_income)}</span></div>
+              <div>Your Expenses: <span className="font-medium text-slate-700">{cs} {fmt(biz.my_expenses)}</span></div>
+            </div>
+
+            {/* Transfers */}
+            {biz.transfers?.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <p className="text-xs font-medium text-slate-500 mb-1.5">Settlements</p>
+                {biz.transfers.map((t, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-xs py-0.5">
+                    <span className="font-semibold text-orange-600">{t.from_name}</span>
+                    <span className="text-slate-400">pays</span>
+                    <span className="font-semibold text-blue-600">{t.to_name}</span>
+                    <span className="ml-auto font-bold text-slate-700">{cs} {fmt(t.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Link>
+          );
+        })}
+      </div>
+
+      {/* Recent Transactions */}
+      <div className="card">
+        <h2 className="font-bold mb-4">Recent Transactions</h2>
+        {data?.recent_transactions?.length === 0 && (
+          <p className="text-slate-400 text-sm py-4 text-center">No transactions yet</p>
+        )}
+        <div className="space-y-2">
+          {data?.recent_transactions?.map(tx => (
+            <div key={tx.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tx.type === 'income' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                  <span className="text-sm font-medium truncate">{tx.description || tx.type}</span>
+                </div>
+                <div className="text-xs text-slate-400 ml-4">
+                  {tx.business_name} &middot; {tx.source === 'combined' ? 'Combined' : tx.user_name} &middot; {tx.date}
+                </div>
+              </div>
+              <span className={`text-sm font-semibold ml-3 ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                {tx.type === 'income' ? '+' : '-'}{tx.currency === 'GBP' ? '\u00a3' : 'Rs'} {fmt(tx.amount)}
+              </span>
+              {tx.currency === 'GBP' && <span className="text-[10px] text-slate-400 ml-1">GBP</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
