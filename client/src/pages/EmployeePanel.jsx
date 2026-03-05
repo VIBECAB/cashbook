@@ -30,8 +30,8 @@ export default function EmployeePanel() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
-  const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalBudget = budgets.reduce((s, b) => s + parseFloat(b.amount), 0);
+  const totalSpent = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
   const remaining = totalBudget - totalSpent;
 
   const handleSubmit = async (e) => {

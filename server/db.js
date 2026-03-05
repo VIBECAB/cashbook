@@ -99,6 +99,18 @@ async function initDb() {
       created_at TIMESTAMP DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS employee_advances (
+      id SERIAL PRIMARY KEY,
+      employee_id INTEGER NOT NULL REFERENCES employees(id),
+      partner_id INTEGER NOT NULL REFERENCES users(id),
+      business_id INTEGER NOT NULL REFERENCES businesses(id),
+      amount NUMERIC NOT NULL CHECK(amount > 0),
+      description TEXT,
+      date DATE NOT NULL,
+      settled INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS partner_ledger (
       id SERIAL PRIMARY KEY,
       created_by INTEGER NOT NULL REFERENCES users(id),

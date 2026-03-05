@@ -13,12 +13,15 @@ export default function Employees() {
   const [selected, setSelected] = useState(null);
   const [budgets, setBudgets] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [advances, setAdvances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBudgetForm, setShowBudgetForm] = useState(null);
+  const [showAdvanceForm, setShowAdvanceForm] = useState(null);
 
   const [newEmp, setNewEmp] = useState({ name: '', username: '', password: '' });
   const [budgetForm, setBudgetForm] = useState({ amount: '', description: '', date: new Date().toISOString().split('T')[0] });
+  const [advanceForm, setAdvanceForm] = useState({ amount: '', description: '', date: new Date().toISOString().split('T')[0] });
   const [error, setError] = useState('');
 
   const fetchEmployees = () => {
@@ -35,12 +38,14 @@ export default function Employees() {
 
   const selectEmployee = async (emp) => {
     setSelected(emp);
-    const [b, e] = await Promise.all([
+    const [b, e, a] = await Promise.all([
       api.getEmployeeBudgets(emp.id),
-      api.getEmployeeExpenses(emp.id)
+      api.getEmployeeExpenses(emp.id),
+      api.getEmployeeAdvances(emp.id)
     ]);
     setBudgets(b);
     setExpenses(e);
+    setAdvances(a);
   };
 
   const handleAddEmployee = async (e) => {
@@ -69,6 +74,34 @@ export default function Employees() {
       setShowBudgetForm(null);
       fetchEmployees();
       if (selected?.id === showBudgetForm.id) selectEmployee(showBudgetForm);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleGiveAdvance = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await api.giveAdvance(showAdvanceForm.id, {
+        ...advanceForm,
+        amount: parseFloat(advanceForm.amount),
+        business_id: businessId
+      });
+      setAdvanceForm({ amount: '', description: '', date: new Date().toISOString().split('T')[0] });
+      setShowAdvanceForm(null);
+      fetchEmployees();
+      if (selected?.id === showAdvanceForm.id) selectEmployee(showAdvanceForm);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleSettleAdvance = async (empId, advanceId) => {
+    try {
+      await api.settleAdvance(empId, advanceId);
+      fetchEmployees();
+      if (selected) selectEmployee(selected);
     } catch (err) {
       setError(err.message);
     }
@@ -130,7 +163,7 @@ export default function Employees() {
                 {emp.active ? 'Active' : 'Inactive'}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-xs mb-3" onClick={() => selectEmployee(emp)}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-3" onClick={() => selectEmployee(emp)}>
               <div>
                 <p className="text-slate-500">Budget</p>
                 <p className="font-semibold">Rs {fmt(emp.total_budget)}</p>
@@ -140,13 +173,25 @@ export default function Employees() {
                 <p className="font-semibold text-red-600">Rs {fmt(emp.total_spent)}</p>
               </div>
               <div>
+                <p className="text-slate-500">Advance</p>
+                <p className={`font-semibold ${parseFloat(emp.unsettled_advances) > 0 ? 'text-orange-600' : ''}`}>Rs {fmt(emp.unsettled_advances)}</p>
+              </div>
+              <div>
                 <p className="text-slate-500">Remaining</p>
                 <p className="font-semibold text-emerald-600">Rs {fmt(emp.total_budget - emp.total_spent)}</p>
               </div>
             </div>
+            {parseFloat(emp.unsettled_advances) > 0 && (
+              <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1.5 rounded mb-3">
+                Rs {fmt(emp.unsettled_advances)} advance to deduct from next budget
+              </div>
+            )}
             <div className="flex gap-2">
-              <button onClick={() => { setShowBudgetForm(emp); setError(''); }} className="btn-success text-xs py-1.5 px-3">
+              <button onClick={() => { setShowBudgetForm(emp); setShowAdvanceForm(null); setError(''); }} className="btn-success text-xs py-1.5 px-3">
                 Give Budget
+              </button>
+              <button onClick={() => { setShowAdvanceForm(emp); setShowBudgetForm(null); setError(''); }} className="btn-primary text-xs py-1.5 px-3">
+                Give Advance
               </button>
               <button onClick={() => handleToggle(emp)} className="btn-outline text-xs py-1.5 px-3">
                 {emp.active ? 'Deactivate' : 'Activate'}
@@ -185,6 +230,35 @@ export default function Employees() {
         </form>
       )}
 
+      {/* Give Advance Form */}
+      {showAdvanceForm && (
+        <form onSubmit={handleGiveAdvance} className="card mb-5">
+          <h3 className="font-semibold mb-3">Give Advance to {showAdvanceForm.name}</h3>
+          {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg mb-3">{error}</div>}
+          <p className="text-xs text-slate-500 mb-3">
+            This will be logged as your expense. The advance will be shown when giving next month's budget.
+          </p>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="label">Amount (Rs)</label>
+              <input type="number" className="input" required min="1" value={advanceForm.amount} onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Description</label>
+              <input className="input" value={advanceForm.description} onChange={e => setAdvanceForm({ ...advanceForm, description: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Date</label>
+              <input type="date" className="input" required value={advanceForm.date} onChange={e => setAdvanceForm({ ...advanceForm, date: e.target.value })} />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="btn-primary">Give Advance</button>
+            <button type="button" onClick={() => setShowAdvanceForm(null)} className="btn-outline">Cancel</button>
+          </div>
+        </form>
+      )}
+
       {/* Selected Employee Details */}
       {selected && (
         <div className="card">
@@ -200,6 +274,32 @@ export default function Employees() {
                   <div key={b.id} className="flex justify-between text-sm py-1.5 border-b border-slate-50">
                     <span>Rs {fmt(b.amount)} from {b.partner_name} {b.description ? `- ${b.description}` : ''}</span>
                     <span className="text-slate-400 text-xs">{b.date}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mb-5">
+            <h4 className="text-sm font-medium text-orange-600 mb-2">Advances</h4>
+            {advances.length === 0 ? (
+              <p className="text-xs text-slate-400">No advances</p>
+            ) : (
+              <div className="space-y-1">
+                {advances.map(a => (
+                  <div key={a.id} className="flex justify-between items-center text-sm py-1.5 border-b border-slate-50">
+                    <span>
+                      Rs {fmt(a.amount)} from {a.partner_name} {a.description ? `- ${a.description}` : ''}
+                      {a.settled ? <span className="ml-2 text-xs text-emerald-600 font-medium">(Settled)</span> : <span className="ml-2 text-xs text-orange-600 font-medium">(Pending)</span>}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 text-xs">{a.date}</span>
+                      {!a.settled && (
+                        <button onClick={() => handleSettleAdvance(selected.id, a.id)} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded hover:bg-emerald-100">
+                          Settle
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
