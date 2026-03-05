@@ -7,7 +7,8 @@ function fmt(n) {
   return new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 }
 
-const CATEGORIES = ['', 'Rent', 'Utilities', 'Supplies', 'Salary', 'Transport', 'Food', 'Marketing', 'Employee Budget', 'Employee Advance', 'Miscellaneous'];
+const EXPENSE_CATEGORIES = ['', 'Rent', 'Utilities', 'Supplies', 'Salary', 'Transport', 'Food', 'Marketing', 'Employee Budget', 'Employee Advance', 'Miscellaneous'];
+const INCOME_CATEGORIES = ['', 'Bank', 'Cash'];
 const CUR_SYMBOL = { PKR: 'Rs', GBP: '\u00a3' };
 
 export default function BusinessDetail() {
@@ -121,12 +122,14 @@ export default function BusinessDetail() {
   const combinedIncome = transactions.filter(t => t.type === 'income' && t.source === 'combined').reduce((s, t) => s + parseFloat(t.amount), 0);
   const combinedBalance = combinedIncome - totalWithdrawals;
 
+  const categories = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold">{business?.name}</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-lg sm:text-xl font-bold">{business?.name}</h1>
+          <p className="text-xs sm:text-sm text-slate-500">
             Partners: {business?.partners?.map(p => p.name).join(', ')}
           </p>
         </div>
@@ -134,23 +137,23 @@ export default function BusinessDetail() {
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="input w-auto text-sm"
+          className="input w-auto text-xs sm:text-sm"
         />
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="card text-center py-3 px-2">
-          <p className="text-xs text-slate-500">Income</p>
-          <p className="font-bold text-emerald-600 text-sm">{cs} {fmt(totalIncome)}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+        <div className="card text-center py-2.5 sm:py-3 px-1 sm:px-2">
+          <p className="text-[10px] sm:text-xs text-slate-500">Income</p>
+          <p className="font-bold text-emerald-600 text-xs sm:text-sm">{cs} {fmt(totalIncome)}</p>
         </div>
-        <div className="card text-center py-3 px-2">
-          <p className="text-xs text-slate-500">Expenses</p>
-          <p className="font-bold text-red-600 text-sm">{cs} {fmt(totalExpenses)}</p>
+        <div className="card text-center py-2.5 sm:py-3 px-1 sm:px-2">
+          <p className="text-[10px] sm:text-xs text-slate-500">Expenses</p>
+          <p className="font-bold text-red-600 text-xs sm:text-sm">{cs} {fmt(totalExpenses)}</p>
         </div>
-        <div className="card text-center py-3 px-2">
-          <p className="text-xs text-slate-500">{totalIncome - totalExpenses >= 0 ? 'Profit' : 'Loss'}</p>
-          <p className={`font-bold text-sm ${totalIncome - totalExpenses >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+        <div className="card text-center py-2.5 sm:py-3 px-1 sm:px-2">
+          <p className="text-[10px] sm:text-xs text-slate-500">{totalIncome - totalExpenses >= 0 ? 'Profit' : 'Loss'}</p>
+          <p className={`font-bold text-xs sm:text-sm ${totalIncome - totalExpenses >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {cs} {fmt(Math.abs(totalIncome - totalExpenses))}
           </p>
         </div>
@@ -158,52 +161,52 @@ export default function BusinessDetail() {
 
       {/* Combined Account Balance */}
       {business?.has_combined_account && combinedIncome > 0 && (
-        <div className="card mb-5 py-3 flex items-center justify-between">
+        <div className="card mb-4 py-2.5 flex items-center justify-between">
           <div>
             <p className="text-xs text-slate-500">Combined Account (Kiddie Tube)</p>
-            <p className="text-xs text-slate-400">Income: {cs} {fmt(combinedIncome)} | Withdrawn: {cs} {fmt(totalWithdrawals)}</p>
+            <p className="text-[10px] sm:text-xs text-slate-400">In: {cs} {fmt(combinedIncome)} | Out: {cs} {fmt(totalWithdrawals)}</p>
           </div>
-          <p className={`font-bold ${combinedBalance >= 0 ? 'text-sky-600' : 'text-red-600'}`}>
-            Balance: {cs} {fmt(combinedBalance)}
+          <p className={`font-bold text-sm ${combinedBalance >= 0 ? 'text-sky-600' : 'text-red-600'}`}>
+            {cs} {fmt(combinedBalance)}
           </p>
         </div>
       )}
 
       {/* Add Transaction Button / Form */}
       {!showForm ? (
-        <button onClick={() => { setEditingTx(null); setShowForm(true); }} className="btn-primary w-full mb-5">
+        <button onClick={() => { setEditingTx(null); setShowForm(true); }} className="btn-primary w-full mb-4 py-3">
           + Add Transaction
         </button>
       ) : (
-        <form onSubmit={handleSubmit} className="card mb-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">{editingTx ? 'Edit Transaction' : 'New Transaction'}</h3>
+        <form onSubmit={handleSubmit} className="card mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm">{editingTx ? 'Edit Transaction' : 'New Transaction'}</h3>
             <button type="button" onClick={cancelForm} className="text-slate-400 hover:text-slate-600 text-sm">Cancel</button>
           </div>
-          {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg mb-3">{error}</div>}
+          {error && <div className="bg-red-50 text-red-600 text-xs px-3 py-2 rounded-lg mb-3">{error}</div>}
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-2 gap-2 mb-3">
             <div>
-              <label className="label">Type</label>
-              <select className="input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+              <label className="label text-xs">Type</label>
+              <select className="input text-sm" value={form.type} onChange={e => setForm({ ...form, type: e.target.value, category: '' })}>
                 <option value="expense">Expense</option>
                 <option value="income">Income</option>
-                {business?.has_combined_account && <option value="withdrawal">Withdrawal (from Combined)</option>}
+                {business?.has_combined_account && <option value="withdrawal">Withdrawal</option>}
               </select>
             </div>
             {form.type === 'income' && business?.has_combined_account ? (
               <div>
-                <label className="label">Source</label>
-                <select className="input" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}>
+                <label className="label text-xs">Source</label>
+                <select className="input text-sm" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}>
                   <option value="personal">Personal (You)</option>
                   <option value="combined">Combined Account</option>
                 </select>
               </div>
             ) : (
               <div>
-                <label className="label">Category</label>
-                <select className="input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c || 'Select category'}</option>)}
+                <label className="label text-xs">Category</label>
+                <select className="input text-sm" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                  {categories.map(c => <option key={c} value={c}>{c || 'Select category'}</option>)}
                 </select>
               </div>
             )}
@@ -211,53 +214,53 @@ export default function BusinessDetail() {
 
           {form.type === 'income' && business?.has_combined_account && (
             <div className="mb-3">
-              <label className="label">Category</label>
-              <select className="input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c || 'Select category'}</option>)}
+              <label className="label text-xs">Category</label>
+              <select className="input text-sm" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                {categories.map(c => <option key={c} value={c}>{c || 'Select category'}</option>)}
               </select>
             </div>
           )}
 
           {(form.category === 'Employee Budget' || form.category === 'Employee Advance') && form.type === 'expense' && !editingTx && (
             <div className="mb-3">
-              <label className="label">Employee</label>
-              <select className="input" value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} required>
+              <label className="label text-xs">Employee</label>
+              <select className="input text-sm" value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} required>
                 <option value="">Select employee</option>
                 {employees.map(emp => (
                   <option key={emp.id} value={emp.id}>{emp.name}</option>
                 ))}
               </select>
-              {employees.length === 0 && <p className="text-xs text-slate-400 mt-1">No active employees. Add one from the Employees tab.</p>}
+              {employees.length === 0 && <p className="text-[10px] text-slate-400 mt-1">No active employees.</p>}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-2 gap-2 mb-3">
             <div>
-              <label className="label">Amount ({cs})</label>
-              <input type="number" className="input" placeholder="0" min="1" step="any" required value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+              <label className="label text-xs">Amount ({cs})</label>
+              <input type="number" className="input text-sm" placeholder="0" min="1" step="any" required value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
             </div>
             <div>
-              <label className="label">Date</label>
-              <input type="date" className="input" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+              <label className="label text-xs">Date</label>
+              <input type="date" className="input text-sm" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
             </div>
           </div>
-          <div className="mb-4">
-            <label className="label">Description</label>
-            <input type="text" className="input" placeholder="What's this for?" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <div className="mb-3">
+            <label className="label text-xs">Description</label>
+            <input type="text" className="input text-sm" placeholder="What's this for?" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
           </div>
-          <button type="submit" disabled={submitting} className={form.type === 'income' ? 'btn-success w-full' : form.type === 'withdrawal' ? 'btn-primary w-full' : 'btn-danger w-full'}>
+          <button type="submit" disabled={submitting} className={`w-full py-3 ${form.type === 'income' ? 'btn-success' : form.type === 'withdrawal' ? 'btn-primary' : 'btn-danger'}`}>
             {submitting ? 'Saving...' : `Add ${form.type === 'income' ? 'Income' : form.type === 'withdrawal' ? 'Withdrawal' : 'Expense'}`}
           </button>
         </form>
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
         {['all', 'income', 'expense', ...(business?.has_combined_account ? ['withdrawal'] : [])].map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
               filter === f ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
@@ -267,34 +270,34 @@ export default function BusinessDetail() {
       </div>
 
       {/* Transaction List */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {filtered.length === 0 && (
-          <div className="card text-center text-slate-400 py-8">No transactions for this month</div>
+          <div className="card text-center text-slate-400 py-8 text-sm">No transactions for this month</div>
         )}
         {filtered.map(tx => (
-          <div key={tx.id} className="card py-3 flex items-start justify-between gap-3">
+          <div key={tx.id} className="card py-3 px-3 sm:px-5 flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tx.type === 'income' ? 'bg-emerald-500' : tx.type === 'withdrawal' ? 'bg-sky-500' : 'bg-red-500'}`}></span>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${tx.type === 'income' ? 'bg-emerald-500' : tx.type === 'withdrawal' ? 'bg-sky-500' : 'bg-red-500'}`}></span>
                 <span className="font-medium text-sm truncate">{tx.description || tx.category || tx.type}</span>
-                {tx.type === 'withdrawal' && <span className="badge bg-sky-50 text-sky-600">Withdrawal</span>}
+                {tx.type === 'withdrawal' && <span className="badge bg-sky-50 text-sky-600 text-[10px] py-0">WD</span>}
               </div>
-              <div className="text-xs text-slate-400 ml-4 flex flex-wrap gap-x-2">
-                <span>{tx.type === 'withdrawal' ? `${tx.user_name} from Combined` : tx.source === 'combined' ? 'Combined Account' : tx.user_name}</span>
+              <div className="text-[10px] sm:text-xs text-slate-400 ml-3 flex flex-wrap gap-x-1.5">
+                <span>{tx.type === 'withdrawal' ? `${tx.user_name}` : tx.source === 'combined' ? 'Combined' : tx.user_name}</span>
                 {tx.category && <span>&middot; {tx.category}</span>}
                 <span>&middot; {tx.date}</span>
               </div>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               <span className={`font-semibold text-sm ${tx.type === 'income' ? 'text-emerald-600' : tx.type === 'withdrawal' ? 'text-sky-600' : 'text-red-600'}`}>
                 {tx.type === 'income' ? '+' : '-'}{cs} {fmt(tx.amount)}
               </span>
               {(tx.user_id === user.id || tx.source === 'combined') && (
                 <>
-                  <button onClick={() => handleEdit(tx)} className="text-slate-300 hover:text-blue-500 transition-colors p-1" title="Edit">
+                  <button onClick={() => handleEdit(tx)} className="text-slate-300 hover:text-blue-500 transition-colors p-1.5" title="Edit">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
-                  <button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1" title="Delete">
+                  <button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1.5" title="Delete">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
                 </>

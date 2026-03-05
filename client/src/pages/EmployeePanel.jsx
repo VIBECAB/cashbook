@@ -59,79 +59,80 @@ export default function EmployeePanel() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-slate-800 text-white sticky top-0 z-50">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
-          <div>
-            <span className="font-bold">Cashbook</span>
-            <span className="text-xs text-slate-400 ml-2">{user.business_name}</span>
+        <div className="max-w-lg mx-auto px-3 h-12 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src="/favicon.svg" alt="" className="w-5 h-5 rounded" />
+            <span className="font-bold text-sm">Cashbook</span>
+            <span className="text-[10px] text-slate-400">{user.business_name}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowPwModal(true)} className="text-sm text-slate-300 hover:text-white transition-colors">{user.name}</button>
-            <button onClick={logout} className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-md">Logout</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowPwModal(true)} className="text-xs text-slate-300 hover:text-white transition-colors">{user.name}</button>
+            <button onClick={logout} className="text-[10px] bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-md">Logout</button>
           </div>
         </div>
       </header>
 
       {showPwModal && <ChangePassword onClose={() => setShowPwModal(false)} />}
 
-      <main className="max-w-lg mx-auto px-4 py-5">
+      <main className="max-w-lg mx-auto px-3 py-4">
         {/* Budget Summary */}
-        <div className="grid grid-cols-3 gap-3 mb-5">
-          <div className="card text-center py-3">
-            <p className="text-xs text-slate-500">Budget</p>
-            <p className="font-bold text-sm">Rs {fmt(totalBudget)}</p>
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="card text-center py-2.5 px-1">
+            <p className="text-[10px] text-slate-500">Budget</p>
+            <p className="font-bold text-xs">Rs {fmt(totalBudget)}</p>
           </div>
-          <div className="card text-center py-3">
-            <p className="text-xs text-slate-500">Spent</p>
-            <p className="font-bold text-red-600 text-sm">Rs {fmt(totalSpent)}</p>
+          <div className="card text-center py-2.5 px-1">
+            <p className="text-[10px] text-slate-500">Spent</p>
+            <p className="font-bold text-red-600 text-xs">Rs {fmt(totalSpent)}</p>
           </div>
-          <div className="card text-center py-3">
-            <p className="text-xs text-slate-500">Remaining</p>
-            <p className={`font-bold text-sm ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Rs {fmt(remaining)}</p>
+          <div className="card text-center py-2.5 px-1">
+            <p className="text-[10px] text-slate-500">Remaining</p>
+            <p className={`font-bold text-xs ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Rs {fmt(remaining)}</p>
           </div>
         </div>
 
         {/* Add Expense */}
         {!showForm ? (
-          <button onClick={() => setShowForm(true)} className="btn-danger w-full mb-5">+ Add Expense</button>
+          <button onClick={() => setShowForm(true)} className="btn-danger w-full mb-4 py-3 text-sm">+ Add Expense</button>
         ) : (
-          <form onSubmit={handleSubmit} className="card mb-5">
-            <h3 className="font-semibold mb-3">New Expense</h3>
-            {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg mb-3">{error}</div>}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+          <form onSubmit={handleSubmit} className="card mb-4 p-3">
+            <h3 className="font-semibold text-sm mb-3">New Expense</h3>
+            {error && <div className="bg-red-50 text-red-600 text-xs px-3 py-2 rounded-lg mb-3">{error}</div>}
+            <div className="grid grid-cols-2 gap-2 mb-3">
               <div>
-                <label className="label">Amount (Rs)</label>
-                <input type="number" className="input" required min="1" step="any" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+                <label className="label text-xs">Amount (Rs)</label>
+                <input type="number" className="input text-sm" required min="1" step="any" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
               </div>
               <div>
-                <label className="label">Date</label>
-                <input type="date" className="input" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+                <label className="label text-xs">Date</label>
+                <input type="date" className="input text-sm" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
               </div>
             </div>
             <div className="mb-3">
-              <label className="label">Description</label>
-              <input className="input" placeholder="What did you spend on?" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+              <label className="label text-xs">Description</label>
+              <input className="input text-sm" placeholder="What did you spend on?" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
             </div>
             <div className="flex gap-2">
-              <button type="submit" disabled={submitting} className="btn-danger flex-1">{submitting ? 'Saving...' : 'Add Expense'}</button>
+              <button type="submit" disabled={submitting} className="btn-danger flex-1 py-3">{submitting ? 'Saving...' : 'Add Expense'}</button>
               <button type="button" onClick={() => setShowForm(false)} className="btn-outline">Cancel</button>
             </div>
           </form>
         )}
 
         {/* Budgets Received */}
-        <div className="card mb-5">
-          <h3 className="font-semibold mb-3">Budgets Received</h3>
+        <div className="card mb-4 p-3">
+          <h3 className="font-semibold text-sm mb-2">Budgets Received</h3>
           {budgets.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-3">No budgets received yet</p>
+            <p className="text-xs text-slate-400 text-center py-3">No budgets received yet</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {budgets.map(b => (
-                <div key={b.id} className="flex justify-between py-2 border-b border-slate-50 last:border-0 text-sm">
+                <div key={b.id} className="flex justify-between py-1.5 border-b border-slate-50 last:border-0 text-xs">
                   <div>
                     <p className="font-medium">Rs {fmt(b.amount)}</p>
-                    <p className="text-xs text-slate-400">From {b.partner_name} {b.description ? `- ${b.description}` : ''}</p>
+                    <p className="text-[10px] text-slate-400">From {b.partner_name} {b.description ? `- ${b.description}` : ''}</p>
                   </div>
-                  <span className="text-xs text-slate-400 self-center">{b.date}</span>
+                  <span className="text-[10px] text-slate-400 self-center">{b.date}</span>
                 </div>
               ))}
             </div>
@@ -139,19 +140,19 @@ export default function EmployeePanel() {
         </div>
 
         {/* Expenses */}
-        <div className="card">
-          <h3 className="font-semibold mb-3">My Expenses</h3>
+        <div className="card p-3">
+          <h3 className="font-semibold text-sm mb-2">My Expenses</h3>
           {expenses.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-3">No expenses posted yet</p>
+            <p className="text-xs text-slate-400 text-center py-3">No expenses posted yet</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {expenses.map(e => (
-                <div key={e.id} className="flex justify-between py-2 border-b border-slate-50 last:border-0 text-sm">
+                <div key={e.id} className="flex justify-between py-1.5 border-b border-slate-50 last:border-0 text-xs">
                   <div>
                     <p className="font-medium text-red-600">Rs {fmt(e.amount)}</p>
-                    <p className="text-xs text-slate-400">{e.description || 'No description'}</p>
+                    <p className="text-[10px] text-slate-400">{e.description || 'No description'}</p>
                   </div>
-                  <span className="text-xs text-slate-400 self-center">{e.date}</span>
+                  <span className="text-[10px] text-slate-400 self-center">{e.date}</span>
                 </div>
               ))}
             </div>
