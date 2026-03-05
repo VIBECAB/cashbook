@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: cashbook
+    runtime: node
+    plan: free
+    buildCommand: npm install && cd client && npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://postgres:iToY2xtN3k3Waeld@db.ndnkndazxvwrajdqklof.supabase.co:5432/postgres
+      - key: JWT_SECRET
+        value: cashbook_secret_key_2024
+      - key: NODE_ENV
+        value: production
