@@ -1,4 +1,6 @@
 require('dotenv').config();
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
 const { Pool, types } = require('pg');
 
 // Return DATE columns as 'YYYY-MM-DD' strings, not Date objects
