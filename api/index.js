@@ -25,9 +25,13 @@ app.use('/api/ledger', ledgerRoutes);
 let dbInitialized = false;
 
 module.exports = async (req, res) => {
-  if (!dbInitialized) {
-    await db.initDb();
-    dbInitialized = true;
+  try {
+    if (!dbInitialized) {
+      await db.initDb();
+      dbInitialized = true;
+    }
+    app(req, res);
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
-  app(req, res);
 };
