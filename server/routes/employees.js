@@ -33,7 +33,8 @@ router.get('/', async (req, res) => {
 
     res.json(employees);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -64,7 +65,8 @@ router.post('/', partnerOnly, async (req, res) => {
 
     res.status(201).json({ id: result.id, name, username, business_id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -113,7 +115,8 @@ router.post('/:id/budget', partnerOnly, async (req, res) => {
       throw e;
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -133,7 +136,8 @@ router.get('/:id/budgets', async (req, res) => {
 
     res.json(budgets);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -146,7 +150,8 @@ router.get('/:id/expenses', async (req, res) => {
 
     res.json(expenses);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -192,7 +197,8 @@ router.post('/:id/expenses', async (req, res) => {
 
     res.status(201).json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -238,7 +244,8 @@ router.post('/:id/advance', partnerOnly, async (req, res) => {
       throw e;
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -255,7 +262,8 @@ router.get('/:id/advances', async (req, res) => {
 
     res.json(advances);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -269,7 +277,8 @@ router.post('/:id/advance/:advanceId/settle', partnerOnly, async (req, res) => {
     await db.query('UPDATE employee_advances SET settled = 1 WHERE id = $1', [advance.id]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -286,7 +295,8 @@ router.patch('/:id/toggle', partnerOnly, async (req, res) => {
     await db.query('UPDATE employees SET active = $1 WHERE id = $2', [employee.active ? 0 : 1, employee.id]);
     res.json({ success: true, active: !employee.active });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

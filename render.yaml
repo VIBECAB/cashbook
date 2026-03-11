@@ -7,8 +7,10 @@ services:
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
-        value: postgresql://postgres:***REDACTED_DB_PASSWORD***@db.ndnkndazxvwrajdqklof.supabase.co:5432/postgres
+        sync: false
       - key: JWT_SECRET
-        value: ***REDACTED_JWT_SECRET***
+        sync: false
       - key: NODE_ENV
         value: production
+      - key: ALLOWED_ORIGINS
+        sync: false

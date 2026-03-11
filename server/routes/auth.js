@@ -42,7 +42,7 @@ router.post('/login', async (req, res) => {
       tokenPayload.business_id = user.business_id;
     }
 
-    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
 
     res.json({
       token,
@@ -54,7 +54,8 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -90,7 +91,8 @@ router.get('/me', authMiddleware, async (req, res) => {
 
     res.json(req.user);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -101,8 +103,8 @@ router.post('/change-password', authMiddleware, async (req, res) => {
     if (!current_password || !new_password) {
       return res.status(400).json({ error: 'Current password and new password required' });
     }
-    if (new_password.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
     }
 
     const table = req.user.role === 'partner' ? 'users' : 'employees';
@@ -117,7 +119,8 @@ router.post('/change-password', authMiddleware, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

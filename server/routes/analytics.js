@@ -221,7 +221,8 @@ router.get('/', async (req, res) => {
       daily_data: dailyData
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -389,7 +390,8 @@ router.get('/dashboard', async (req, res) => {
       recent_transactions: recentTransactions
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

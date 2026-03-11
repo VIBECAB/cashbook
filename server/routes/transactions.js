@@ -57,7 +57,8 @@ router.get('/', async (req, res) => {
     const transactions = await db.all(query, params);
     res.json(transactions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -107,7 +108,8 @@ router.post('/', partnerOnly, async (req, res) => {
 
     res.status(201).json(transaction);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -145,7 +147,8 @@ router.put('/:id', partnerOnly, async (req, res) => {
     );
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -176,7 +179,8 @@ router.delete('/:id', partnerOnly, async (req, res) => {
     await db.query('DELETE FROM transactions WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

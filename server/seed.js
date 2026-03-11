@@ -73,15 +73,8 @@ async function seed() {
 
     await client.query('COMMIT');
 
-    console.log('Partners created:');
-    console.log('  Akram  - username: akram, password: akram123');
-    console.log('  Sajid  - username: sajid, password: sajid123');
-    console.log('  Hammad - username: hammad, password: hammad123');
-    console.log('');
-    console.log('Businesses:');
-    console.log('  InParlor (Akram, Sajid, Hammad) - with combined account (Kiddie Tube)');
-    console.log('  TPT (Akram, Sajid)');
-    console.log('  GBP Account (Akram, Sajid, Hammad) - GBP currency');
+    console.log('Partners created: Akram, Sajid, Hammad');
+    console.log('Businesses: InParlor, TPT, GBP Account');
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

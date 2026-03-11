@@ -42,7 +42,8 @@ router.get('/', async (req, res) => {
 
     res.json(entries);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -99,7 +100,8 @@ router.get('/summary', async (req, res) => {
 
     res.json(summaries);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -135,7 +137,8 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(entry);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -164,7 +167,8 @@ router.put('/:id', async (req, res) => {
 
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -181,7 +185,8 @@ router.delete('/:id', async (req, res) => {
     await db.query('DELETE FROM partner_ledger WHERE id = $1', [entry.id]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
