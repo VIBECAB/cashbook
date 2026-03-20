@@ -7,7 +7,7 @@ function fmt(n) {
   return new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 }
 
-const EXPENSE_CATEGORIES = ['', 'Rent', 'Utilities', 'Supplies', 'Salary', 'Transport', 'Food', 'Marketing', 'Employee Budget', 'Employee Advance', 'Miscellaneous'];
+const EXPENSE_CATEGORIES = ['', 'Rent', 'Utilities', 'Supplies', 'Salary', 'Transport', 'Food', 'Marketing', 'Donation', 'Employee Budget', 'Employee Advance', 'Miscellaneous'];
 const INCOME_CATEGORIES = ['', 'Bank', 'Cash'];
 const CUR_SYMBOL = { PKR: 'Rs', GBP: '\u00a3' };
 

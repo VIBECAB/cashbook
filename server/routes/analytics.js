@@ -131,6 +131,13 @@ router.get('/', async (req, res) => {
       `, [business_id, p.id, monthStr, year, safeCur]);
       const withdrawals = parseFloat(pwRow.total);
 
+      const donationsRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND user_id = $2 AND type = 'expense' AND category = 'Donation'
+        AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
+      `, [business_id, p.id, monthStr, year, safeCur]);
+      const donations = parseFloat(donationsRow.total);
+
       const profitShare = profit * (parseFloat(p.share_percentage) / 100);
       const netPosition = (personalIncome + withdrawals) - personalExpenses;
       const settlement = profitShare - netPosition;
@@ -142,6 +149,7 @@ router.get('/', async (req, res) => {
         personal_income: personalIncome,
         personal_expenses: personalExpenses,
         withdrawals,
+        donations,
         profit_share: profitShare,
         net_position: netPosition,
         settlement
