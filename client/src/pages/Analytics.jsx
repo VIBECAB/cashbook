@@ -160,7 +160,7 @@ export default function Analytics() {
             })}
             {(() => {
               const totalOwed = Math.round((data?.profit || 0) * 0.1);
-              const totalDonated = Math.round(data?.partners?.reduce((s, p) => s + (p.donations || 0), 0) || 0);
+              const totalDonated = Math.round(data?.total_donations || 0);
               const totalRemaining = Math.max(0, totalOwed - totalDonated);
               return (
                 <>

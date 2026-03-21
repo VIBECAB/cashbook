@@ -107,6 +107,14 @@ router.get('/', async (req, res) => {
     const profit = totalIncome - totalExpenses;
     const combinedBalance = combinedIncome - totalWithdrawals;
 
+    // Total donations across ALL partners for this business/month
+    const totalDonationsRow = await db.get(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+      WHERE business_id = $1 AND type = 'expense' AND category = 'Donation'
+      AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+    `, [business_id, monthStr, year, safeCur]);
+    const totalDonations = parseFloat(totalDonationsRow.total);
+
     // Per-partner breakdown
     const partnerBreakdown = [];
     for (const p of partners) {
@@ -131,21 +139,17 @@ router.get('/', async (req, res) => {
       `, [business_id, p.id, monthStr, year, safeCur]);
       const withdrawals = parseFloat(pwRow.total);
 
-      const donationsRow = await db.get(`
-        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-        WHERE business_id = $1 AND user_id = $2 AND type = 'expense' AND category = 'Donation'
-        AND TO_CHAR(date, 'MM') = $3 AND TO_CHAR(date, 'YYYY') = $4 AND currency = $5
-      `, [business_id, p.id, monthStr, year, safeCur]);
-      const donations = parseFloat(donationsRow.total);
-
-      const profitShare = profit * (parseFloat(p.share_percentage) / 100);
+      const sharePercent = parseFloat(p.share_percentage);
+      const profitShare = profit * (sharePercent / 100);
+      // Each partner's donation credit is their proportional share of ALL donations
+      const donations = totalDonations * (sharePercent / 100);
       const netPosition = (personalIncome + withdrawals) - personalExpenses;
       const settlement = profitShare - netPosition;
 
       partnerBreakdown.push({
         id: p.id,
         name: p.name,
-        share_percentage: parseFloat(p.share_percentage),
+        share_percentage: sharePercent,
         personal_income: personalIncome,
         personal_expenses: personalExpenses,
         withdrawals,
@@ -220,6 +224,7 @@ router.get('/', async (req, res) => {
       total_withdrawals: totalWithdrawals,
       combined_balance: combinedBalance,
       profit,
+      total_donations: totalDonations,
       partners: partnerBreakdown,
       transfers,
       income_by_partner: incomeByPartner,
