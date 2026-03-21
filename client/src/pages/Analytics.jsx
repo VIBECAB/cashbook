@@ -130,7 +130,30 @@ export default function Analytics() {
       {/* Charity / Donation */}
       {(data?.profit || 0) > 0 && (
         <div className="card mb-4 p-3 sm:p-5">
-          <h2 className="font-bold text-sm sm:text-base mb-2">Charity (10% of Share)</h2>
+          <h2 className="font-bold text-sm sm:text-base mb-2">Your Charity (10% of Profit)</h2>
+          {(() => {
+            const totalOwed = Math.round((data?.profit || 0) * 0.1);
+            const totalDonated = Math.round(data?.total_donations || 0);
+            const totalRemaining = Math.max(0, totalOwed - totalDonated);
+            return (
+              <div className="bg-purple-50 rounded-lg p-3 mb-3">
+                <div className="flex items-center justify-between text-sm font-bold">
+                  <span>Total Charity Owed</span>
+                  <span className="text-purple-600">{cs} {fmt(totalOwed)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs mt-1">
+                  <span className="text-emerald-600 font-medium">Total Donated</span>
+                  <span className="text-emerald-600 font-medium">{cs} {fmt(totalDonated)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-bold mt-1.5 pt-1.5 border-t border-purple-200">
+                  <span>Remaining</span>
+                  <span className={totalRemaining > 0 ? 'text-orange-600' : 'text-emerald-600'}>
+                    {totalRemaining > 0 ? `${cs} ${fmt(totalRemaining)}` : 'Fully donated'}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
           <div className="space-y-1.5">
             {data?.partners?.map(p => {
               const charityOwed = Math.max(0, p.profit_share * 0.1);
@@ -140,45 +163,16 @@ export default function Analytics() {
                 <div key={p.id} className="py-1.5 border-b border-slate-50 last:border-0">
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="font-medium">{p.name}</span>
-                    <span className="font-bold text-purple-600">{cs} {fmt(Math.round(charityOwed))}</span>
-                  </div>
-                  {donated > 0 && (
-                    <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-500 mt-0.5">
-                      <span className="text-emerald-600">Donated: {cs} {fmt(Math.round(donated))}</span>
-                      <span className={remaining > 0 ? 'text-orange-600 font-semibold' : 'text-emerald-600 font-semibold'}>
-                        {remaining > 0 ? `Remaining: ${cs} ${fmt(Math.round(remaining))}` : 'Fully donated'}
+                    <div className="text-right">
+                      <span className="text-slate-400 line-through text-[10px] mr-1.5">{cs} {fmt(Math.round(charityOwed))}</span>
+                      <span className={`font-bold ${remaining > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                        {remaining > 0 ? `${cs} ${fmt(Math.round(remaining))}` : 'Done'}
                       </span>
                     </div>
-                  )}
-                  {donated === 0 && (
-                    <div className="text-[10px] sm:text-xs text-orange-500 mt-0.5">
-                      Remaining: {cs} {fmt(Math.round(charityOwed))}
-                    </div>
-                  )}
+                  </div>
                 </div>
               );
             })}
-            {(() => {
-              const totalOwed = Math.round((data?.profit || 0) * 0.1);
-              const totalDonated = Math.round(data?.total_donations || 0);
-              const totalRemaining = Math.max(0, totalOwed - totalDonated);
-              return (
-                <>
-                  <div className="flex items-center justify-between pt-1.5 font-bold text-xs sm:text-sm">
-                    <span>Total Charity</span>
-                    <span className="text-purple-600">{cs} {fmt(totalOwed)}</span>
-                  </div>
-                  {totalDonated > 0 && (
-                    <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-500">
-                      <span className="text-emerald-600 font-medium">Total Donated: {cs} {fmt(totalDonated)}</span>
-                      <span className={`font-semibold ${totalRemaining > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
-                        {totalRemaining > 0 ? `Remaining: ${cs} ${fmt(totalRemaining)}` : 'All donated'}
-                      </span>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
           </div>
         </div>
       )}
