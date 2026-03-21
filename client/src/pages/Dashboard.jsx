@@ -13,15 +13,21 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   useEffect(() => {
-    api.getDashboard().then(setData).catch(console.error).finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    const [y, m] = month.split('-');
+    api.getDashboard({ month: m, year: y }).then(setData).catch(console.error).finally(() => setLoading(false));
+  }, [month]);
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-slate-300 border-t-slate-800 rounded-full"></div></div>;
 
-  const now = new Date();
-  const monthName = MONTHS[now.getMonth()];
+  const [y, m] = month.split('-');
+  const monthName = MONTHS[parseInt(m) - 1];
 
   // Aggregate totals by currency
   const totals = {};
@@ -38,9 +44,12 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="mb-5">
-        <h1 className="text-lg sm:text-xl font-bold">Welcome, {user.name}</h1>
-        <p className="text-slate-500 text-xs sm:text-sm">{monthName} {now.getFullYear()} Overview</p>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold">Welcome, {user.name}</h1>
+          <p className="text-slate-500 text-xs sm:text-sm">{monthName} {y} Overview</p>
+        </div>
+        <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="input w-auto text-xs" />
       </div>
 
       {/* Overall Analytics Summary */}

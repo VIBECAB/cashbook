@@ -247,8 +247,8 @@ router.get('/dashboard', async (req, res) => {
     }
 
     const now = new Date();
-    const monthStr = (now.getMonth() + 1).toString().padStart(2, '0');
-    const yearStr = now.getFullYear().toString();
+    const monthStr = req.query.month ? req.query.month.toString().padStart(2, '0') : (now.getMonth() + 1).toString().padStart(2, '0');
+    const yearStr = req.query.year ? req.query.year.toString() : now.getFullYear().toString();
 
     const businesses = await db.all(`
       SELECT b.*, bp.share_percentage

@@ -51,7 +51,7 @@ export const api = {
 
   // Analytics
   getAnalytics: (params) => request(`/analytics?${new URLSearchParams(params)}`),
-  getDashboard: () => request('/analytics/dashboard'),
+  getDashboard: (params) => request(`/analytics/dashboard${params ? `?${new URLSearchParams(params)}` : ''}`),
 
   // Partner Ledger
   getLedger: (partnerId) => request(`/ledger${partnerId ? `?partner_id=${partnerId}` : ''}`),
