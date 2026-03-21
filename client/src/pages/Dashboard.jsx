@@ -27,11 +27,13 @@ export default function Dashboard() {
   const totals = {};
   data?.businesses?.forEach(biz => {
     const cur = biz.default_currency || 'PKR';
-    if (!totals[cur]) totals[cur] = { income: 0, expenses: 0, profit: 0, myShare: 0 };
+    if (!totals[cur]) totals[cur] = { income: 0, expenses: 0, profit: 0, myShare: 0, myDonations: 0, totalDonations: 0 };
     totals[cur].income += parseFloat(biz.total_income) || 0;
     totals[cur].expenses += parseFloat(biz.total_expenses) || 0;
     totals[cur].profit += parseFloat(biz.profit) || 0;
     totals[cur].myShare += parseFloat(biz.my_share) || 0;
+    totals[cur].myDonations += parseFloat(biz.my_donations) || 0;
+    totals[cur].totalDonations += parseFloat(biz.total_donations) || 0;
   });
 
   return (
@@ -71,13 +73,21 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            {t.profit > 0 && (
-              <div className="mt-2 text-center">
-                <span className="text-[10px] sm:text-xs text-slate-400">
-                  Your Charity (10%): <span className="font-semibold text-purple-600">{cs} {fmt(Math.round(t.myShare * 0.1))}</span>
-                </span>
-              </div>
-            )}
+            {t.profit > 0 && (() => {
+              const charityOwed = Math.round(t.myShare * 0.1);
+              const remaining = Math.max(0, charityOwed - Math.round(t.myDonations));
+              return (
+                <div className="mt-2 bg-purple-50 rounded-lg p-2 flex items-center justify-between">
+                  <span className="text-[10px] sm:text-xs text-slate-500">Your Charity (10%)</span>
+                  <div className="text-right">
+                    {t.myDonations > 0 && <span className="text-[10px] text-slate-400 line-through mr-1.5">{cs} {fmt(charityOwed)}</span>}
+                    <span className={`text-xs sm:text-sm font-bold ${remaining > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                      {remaining > 0 ? `${cs} ${fmt(remaining)}` : 'Fully donated'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         );
       })}
@@ -126,12 +136,22 @@ export default function Dashboard() {
             </div>
 
             {/* Charity */}
-            {biz.profit > 0 && (
-              <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] sm:text-xs text-slate-500">
-                <span>Your Charity (10%): </span>
-                <span className="font-semibold text-purple-600">{cs} {fmt(Math.round(biz.my_share * 0.1))}</span>
-              </div>
-            )}
+            {biz.profit > 0 && (() => {
+              const charityOwed = Math.round(biz.my_share * 0.1);
+              const myDonations = Math.round(biz.my_donations || 0);
+              const remaining = Math.max(0, charityOwed - myDonations);
+              return (
+                <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-xs text-slate-500">
+                  <span>Your Charity (10%)</span>
+                  <div>
+                    {myDonations > 0 && <span className="line-through text-slate-400 mr-1.5">{cs} {fmt(charityOwed)}</span>}
+                    <span className={`font-bold ${remaining > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                      {remaining > 0 ? `${cs} ${fmt(remaining)}` : 'Fully donated'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="mt-3 pt-2 border-t border-slate-100 grid grid-cols-2 gap-2 text-[10px] sm:text-xs text-slate-500">
               <div>Your Income: <span className="font-medium text-slate-700">{cs} {fmt(biz.my_income)}</span></div>

@@ -307,8 +307,16 @@ router.get('/dashboard', async (req, res) => {
       `, [biz.id, monthStr, yearStr, cur]);
       const totalWithdrawals = parseFloat(totalWithdrawalsRow.total);
 
+      const totalDonationsRow = await db.get(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+        WHERE business_id = $1 AND type = 'expense' AND category = 'Donation'
+        AND TO_CHAR(date, 'MM') = $2 AND TO_CHAR(date, 'YYYY') = $3 AND currency = $4
+      `, [biz.id, monthStr, yearStr, cur]);
+      const totalDonations = parseFloat(totalDonationsRow.total);
+
       const profit = totalIncome - totalExpenses;
       const myShare = profit * (parseFloat(biz.share_percentage) / 100);
+      const myDonations = totalDonations * (parseFloat(biz.share_percentage) / 100);
 
       const account_balance = biz.has_combined_account && cur === 'PKR'
         ? combinedIncome - totalWithdrawals
@@ -361,6 +369,8 @@ router.get('/dashboard', async (req, res) => {
         my_expenses: myExpenses,
         my_withdrawals: myWithdrawals,
         my_share: myShare,
+        my_donations: myDonations,
+        total_donations: totalDonations,
         account_balance,
         transfers
       };
